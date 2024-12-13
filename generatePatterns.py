@@ -1,30 +1,32 @@
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
+import skimage.io as ski_io
 
+def write_image(path, data, is_float=True):
+    if(is_float):
+        data = np.clip(data, 0.0, 1.0)
+        data = data*255
+    saved = data.astype(np.uint8)
+    ski_io.imsave(path, saved)
 
-
-# def split():
-#     list(imgs.transpose(2, 0, 1))
-
+#inspiration taken from https://github.com/elerac/structuredlight/blob/master/structuredlight/binary.py
 def make_binary(h, w):
-    projection = np.zeros((h,w))
+    show_stripes = False
     num = len(bin(w-1))-2
     num2 = np.log2(w).astype(np.uint8)
 
     print("num is", num, "num2 is", num2)
-
-
-    imgs_code = 255*np.fromfunction(lambda y,x,n: (x&(1<<(num-1-n))!=0), (h,w,num2), dtype=int).astype(np.uint8)
+    imgs_code = 255*np.fromfunction(lambda y,x,n: (x&(1<<(num-1-n))!=0), (h,w,num), dtype=int).astype(np.uint8)
     for i in range(imgs_code.shape[2]):
-        plt.figure(f"projector image {i}")
-        plt.imshow(imgs_code[:,:,i], cmap='gray')
+        write_image(f"./patterns/binary/bin_{i}", False)
+        if(show_stripes):
+            plt.figure(f"projector image {i}")
+            plt.imshow(imgs_code[:,:,i], cmap='gray')
     print("shape of imgs_code", imgs_code.shape) 
-    plt.show()
-
-    #imlist = self.split(imgs_code)
-    #return imlist    
-    pass
+    if(show_stripes):
+        plt.show()  
+    return
 
 def make_gray(h, w):
     pass
