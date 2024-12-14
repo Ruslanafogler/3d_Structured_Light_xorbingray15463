@@ -25,9 +25,11 @@ def get_per_pixel_threshold(img_stack):
     return np.mean(img_stack, axis=2)
 
 
-def classify_imgstack_codes(img_stack, threshold):
-    #gray_img_stack = get_I_lumn(img_stack, has_4_channels=True)
-    gray_img_stack = img_stack #(for confirming with binary patterns)
+def classify_imgstack_codes(img_stack, threshold, test_pattern=False):
+    if(not test_pattern):
+        gray_img_stack = get_I_lumn(img_stack, has_4_channels=True)
+    else:
+        gray_img_stack = img_stack #(for confirming with binary patterns)
     r,c, num_imgs = gray_img_stack.shape
     img_codes = np.zeros_like(gray_img_stack)
     for i in range(num_imgs):
@@ -52,10 +54,45 @@ def decode_gray(img_codes):
     pows_of_two = 1 << np.arange(0, num_codes)
     pows_of_two = pows_of_two[::-1]
     #recusive conversion for gray2bin
-    for i in range(1, num_codes):
-        img_codes[:,:,i] = np.bitwise_xor(img_codes[:,:,i], img_codes[:,:,i-1])
+    print("type of img_codes is", img_codes.dtype)
+    
+    img_codes = img_codes.astype(int)
 
-    decoded = np.sum(img_codes * pows_of_two, axis=2)
+    bin_codes = gray2bin(img_codes, num_codes)
+    
+    
+    # for i in range(1, num_codes):
+    #     img_codes[:,:,i] = np.bitwise_xor(img_codes[:,:,i], img_codes[:,:,i-1])
+
+    decoded = np.sum(bin_codes * pows_of_two, axis=2)
+    return decoded
+
+
+def gray2bin(gray_codes, num_imgs):
+    for i in range(1, num_imgs):
+        gray_codes[:,:,i] = np.bitwise_xor(gray_codes[:,:,i], gray_codes[:,:,i-1]) 
+    return gray_codes
+
+
+def decode_xor(img_codes, final_img_ind=-1):
+    y,x,num_codes = img_codes.shape
+    print("shape of img_codes is", y, x, num_codes)
+    pows_of_two = 1 << np.arange(0, num_codes)
+    pows_of_two = pows_of_two[::-1]
+    #recusive conversion for gray2bin
+    print("type of img_codes is", img_codes.dtype)
+    img_codes = img_codes.astype(int)
+
+    #xor to gray
+    # default to xor-4 (final plane is LAST img), xor2 is second-to-last
+    last_img_in_stack = img_codes[:,:,final_img_ind]
+    imgs_gray = np.empty((y, x, num_codes), dtype=np.uint8)
+    for i in range(num_codes):
+        imgs_gray[:,:,i] = np.bitwise_xor(img_codes[:,:,i], last_img_in_stack)
+    imgs_gray[:,:,final_img_ind] = last_img_in_stack.copy()    
+
+    bin_code = gray2bin(imgs_gray, num_codes) 
+    decoded = np.sum(bin_code * pows_of_two, axis=2)
     return decoded
 
 
@@ -227,35 +264,6 @@ def getImageStack(IMG_PATHS):
 
 
 
-def binary_decode():
-    pass
-
-def gray_decode():
-    pass
-
-
-
-
-'''
-def get_per_pixel_threshold(img_stack):
-    #y,x,(rgb), # of images
-    return np.mean(img_stack, axis=3)
-
-def classify_imgstack_codes(img_stack):
-    gray_img_stack = get_I_lumn(img_stack)
-    threshold = get_per_pixel_threshold(gray_img_stack)
-    img_codes = np.where(gray_img_stack > threshold, 1, 0).astype(np.unint8)
-    return img_codes
-
-def decode_binary(img_codes):
-    y,x,num_codes = img_codes.shape
-    pows_of_two = np.exp(2, np.arange(num_codes))
-    pows_of_two = pows_of_two[:, np.newaxis, np.newaxis]
-    decoded = np.sum(img_codes * pows_of_two, axis=2)
-    return decoded
-'''
-
-
 
 def main():
 
@@ -272,23 +280,27 @@ def main():
     #gray_imgs_stack = getImageStack(GRAY_PATHS)
     #bin_imgs_stack = getImageStack(BINARY_PATHS)
     
-    gray_patterns = getIMGPaths("./patterns/gray", ".tiff")
-    gray_patterns = getImageStack(gray_patterns)
-    gray_codes = classify_imgstack_codes(gray_patterns, threshold=127.0)
-    decoded1 = decode_gray(gray_codes)
-
+    # gray_patterns = getIMGPaths("./patterns/gray", ".tiff")
+    # gray_patterns = getImageStack(gray_patterns)
+    # gray_codes = classify_imgstack_codes(gray_patterns, threshold=127.0, test_pattern=True)
+    # decoded1 = decode_gray(gray_codes)
 
     # bin_patterns = getIMGPaths("./patterns/binary", ".tiff")
     # bin_patterns = getImageStack(bin_patterns)
     # bin_codes = classify_imgstack_codes(bin_patterns, threshold=127.0)
     # decoded2 = decode_binary(bin_codes)
 
+    xor_patterns = getIMGPaths("./patterns/xor", ".tiff")
+    xor_patterns = getImageStack(xor_patterns)
+    xor_codes = classify_imgstack_codes(xor_patterns, threshold=127.0, test_pattern=True)
+    decoded1 = decode_xor(xor_codes)    
+
     # plt.imshow(decoded2, cmap='jet')
     # plt.title("binary")
     # plt.show()
 
     plt.imshow(decoded1, cmap='jet')
-    plt.title("gray")
+    plt.title("xor")
     plt.show()
     return
 
