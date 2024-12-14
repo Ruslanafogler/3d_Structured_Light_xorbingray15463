@@ -2,7 +2,7 @@ import skimage.io as ski_io
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interpn
-from src.cp_hw6 import pixel2ray, set_axes_equal
+from cp_hw6 import pixel2ray, set_axes_equal
 import re, os
 import cv2
 from tqdm import tqdm
@@ -11,9 +11,9 @@ import pickle
 
 def get_I_lumn(I, has_4_channels=False):
     if(has_4_channels):
-        R = I[:,:,:,0]
-        G = I[:,:,:,1]
-        B = I[:,:,:,2]        
+        R = I[:,:,0,:]
+        G = I[:,:,1,:]
+        B = I[:,:,2,:]        
     else:
         R = I[:,:,0]
         G = I[:,:,1]
@@ -22,20 +22,39 @@ def get_I_lumn(I, has_4_channels=False):
 
 def get_per_pixel_threshold(img_stack):
     #y,x,(rgb), # of images
-    return np.mean(img_stack, axis=3)
+    return np.mean(img_stack, axis=2)
 
 
-def classify_imgstack_codes(img_stack):
-    gray_img_stack = get_I_lumn(img_stack)
-    threshold = get_per_pixel_threshold(gray_img_stack)
-    img_codes = np.where(gray_img_stack > threshold, 1, 0).astype(np.unint8)
+def classify_imgstack_codes(img_stack, threshold):
+    #gray_img_stack = get_I_lumn(img_stack, has_4_channels=True)
+    gray_img_stack = img_stack #(for confirming with binary patterns)
+    r,c, num_imgs = gray_img_stack.shape
+    img_codes = np.zeros_like(gray_img_stack)
+    for i in range(num_imgs):
+        img = gray_img_stack[:,:,i]
+        new_img = np.where(img > threshold, 1.0, 0.0)
+        img_codes[:,:,i] = new_img
     return img_codes
 
 
 def decode_binary(img_codes):
     y,x,num_codes = img_codes.shape
-    pows_of_two = np.exp(2, np.arange(num_codes))
-    pows_of_two = pows_of_two[:, np.newaxis, np.newaxis]
+    print("shape of img_codes is", y, x, num_codes)
+    pows_of_two = 1 << np.arange(0, num_codes)
+    pows_of_two = pows_of_two[::-1]
+    decoded = np.sum(img_codes * pows_of_two, axis=2)
+    return decoded
+
+
+def decode_gray(img_codes):
+    y,x,num_codes = img_codes.shape
+    print("shape of img_codes is", y, x, num_codes)
+    pows_of_two = 1 << np.arange(0, num_codes)
+    pows_of_two = pows_of_two[::-1]
+    #recusive conversion for gray2bin
+    for i in range(1, num_codes):
+        img_codes[:,:,i] = np.bitwise_xor(img_codes[:,:,i], img_codes[:,:,i-1])
+
     decoded = np.sum(img_codes * pows_of_two, axis=2)
     return decoded
 
@@ -99,7 +118,11 @@ def get_ray_plane_intersection(ray, ray_pt, plane_pt, normal):
     B = normal[1]
     C = normal[2]
     D = -np.dot(plane_pt, normal)
-    t = (D-np.dot(normal, ray))/(D-np.dot(normal,ray_pt))
+
+
+    #t = (D-np.dot(normal, ray))/(D-np.dot(normal,ray_pt))
+    t= np.dot(normal, plane_pt-ray_pt)/np.dot(normal, ray)
+    
     return ray*t
 
 
@@ -159,15 +182,135 @@ def get_proj_planes(img_codes, intr_p, dist, R_p, T_p):
 def intersect_proj_plane_camera_ray():
     pass
 
+#code inspired from https://stackoverflow.com/questions/5967500/how-to-correctly-sort-a-string-with-a-number-inside
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    http://nedbatchelder.com/blog/200712/human_sorting.html
+    (See Toothy's implementation in the comments)
+    '''
+    return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+
+def getIMGPaths(prefix_path, suffix):
+    images = []
+    #prefix_path = '../data/'
+    for f in os.listdir(prefix_path):
+        split_tup = os.path.splitext(f);        
+        if(split_tup[1] == suffix):
+            images.append(prefix_path + '/' + f)
+    
+    images.sort(key = natural_keys)
+    return images;
+
+def read_img(path, downsample=False, n=10):
+    img = ski_io.imread(path)
+    if(downsample):
+        img = img[::10, ::10]
+    return img
+
+def getImageStack(IMG_PATHS):
+    img_stack = []
+    t = 0
+    for path in IMG_PATHS:
+        I_t = read_img(path, False)
+        print(f"range of image is {t}", np.min(I_t), np.max(I_t))
+        print(f"shape of image {t} is", I_t.shape)
+        img_stack.append(I_t)
+        t+=1
+    img_stack = np.array(img_stack)
+    img_stack = np.moveaxis(img_stack, 0, -1) 
+    print("shape of image stack is:", img_stack.shape)
+    return img_stack
+
+
+
+def binary_decode():
+    pass
+
+def gray_decode():
+    pass
 
 
 
 
+'''
+def get_per_pixel_threshold(img_stack):
+    #y,x,(rgb), # of images
+    return np.mean(img_stack, axis=3)
 
+def classify_imgstack_codes(img_stack):
+    gray_img_stack = get_I_lumn(img_stack)
+    threshold = get_per_pixel_threshold(gray_img_stack)
+    img_codes = np.where(gray_img_stack > threshold, 1, 0).astype(np.unint8)
+    return img_codes
+
+def decode_binary(img_codes):
+    y,x,num_codes = img_codes.shape
+    pows_of_two = np.exp(2, np.arange(num_codes))
+    pows_of_two = pows_of_two[:, np.newaxis, np.newaxis]
+    decoded = np.sum(img_codes * pows_of_two, axis=2)
+    return decoded
+'''
 
 
 
 def main():
+
+    ##DECODING
+
+    #GRAY_PATHS = getIMGPaths("./data/gray/", ".JPG")
+
+    BINARY_PATHS = getIMGPaths("./data/binary", ".JPG")
+    BINARY_PATHS = BINARY_PATHS[:-2]
+    print("BINARY paths are", BINARY_PATHS)
+
+
+    #or make a list....
+    #gray_imgs_stack = getImageStack(GRAY_PATHS)
+    #bin_imgs_stack = getImageStack(BINARY_PATHS)
+    
+    gray_patterns = getIMGPaths("./patterns/gray", ".tiff")
+    gray_patterns = getImageStack(gray_patterns)
+    gray_codes = classify_imgstack_codes(gray_patterns, threshold=127.0)
+    decoded1 = decode_gray(gray_codes)
+
+
+    # bin_patterns = getIMGPaths("./patterns/binary", ".tiff")
+    # bin_patterns = getImageStack(bin_patterns)
+    # bin_codes = classify_imgstack_codes(bin_patterns, threshold=127.0)
+    # decoded2 = decode_binary(bin_codes)
+
+    # plt.imshow(decoded2, cmap='jet')
+    # plt.title("binary")
+    # plt.show()
+
+    plt.imshow(decoded1, cmap='jet')
+    plt.title("gray")
+    plt.show()
+    return
+
+
+
+
+
+
+
+    return
+
+    ###TRIANGULATION
+    cam_intr_stuff = np.load("./data/calib/my_intrinsic_calib.npz")
+    #extr_stuff = np.load("./data/my-data/need/prmy_extrinsic_calib.npz")
+    
+    intr_p = cam_intr_stuff["mtx"]
+    dist_p = cam_intr_stuff["dist"]
+    rvecs_P = cam_intr_stuff["rvecs"]
+    tvecs_P = cam_intr_stuff["tvecs"]
+    extr_R_p, _ = cv2.Rodrigues(rvecs_P)
+    extr_T_p = tvecs_P.ravel() 
+
 
     #projector related matrices
     intr_p = 5
@@ -183,11 +326,11 @@ def main():
 
     img_codes = np.zeros(5,5)
 
-    FROG_MIN_X = 303
-    FROG_MAX_X = 815
+    SL_MIN_X = 303
+    SL_MAX_X = 815
 
-    FROG_MIN_Y = 304
-    FROG_MAX_Y = 655
+    SL_MIN_Y = 304
+    SL_MAX_Y = 655
 
     #extra todos--> filter out pattern results and make sure that columns
     #have actually matching codes??
@@ -199,9 +342,9 @@ def main():
 
     #triangulating part...
     proj_planes, proj_normals = get_proj_planes(img_codes, intr_p, dist_p, extr_R_p, extr_T_p)
-    reconstructed = np.zeros((FROG_MAX_Y-FROG_MIN_Y, FROG_MAX_X-FROG_MIN_X))
-    for row in range(FROG_MIN_Y, FROG_MAX_Y):
-        for col in range(FROG_MIN_X, FROG_MAX_X):
+    reconstructed = np.zeros((SL_MAX_Y-SL_MIN_Y, SL_MAX_X-SL_MIN_X))
+    for row in range(SL_MIN_Y, SL_MAX_Y):
+        for col in range(SL_MIN_X, SL_MAX_X):
             img_ray = get_camera_ray(np.array([col, row]), 
                                      intr_c, dist_c, 
                                      extr_R_c, extr_T_c)
