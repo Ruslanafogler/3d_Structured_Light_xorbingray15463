@@ -12,16 +12,27 @@ if __name__ == "__main__":
     #Input data locations
     #for CAMERA calibration:
     baseDir = './data/calib' #data directory
-    calName = '12_14_calib' #calibration sourse (also a dir in data)
-    projName = '12_14_projgray'
+    calName = '12_15_calib' #calibration sourse (also a dir in data)
+    projName = '12_15_projgray'
     image_ext = 'JPG' #file extension for images
     skip_cam_intrinsic = True
-    skip_cam_extrinsic = True
+    skip_cam_extrinsic = False
     load_proj_decoded = True
     
     useLowRes = False #enable lowres for debugging
 
+    extr_img = "./data/calib/normal00013.JPG"
+
     
+    w = 1719
+    h = 2128
+    #2235 x, 943 y
+
+    start_h = 943
+    start_w = 2235
+
+    def get_slice(img):
+        return img[start_h: start_h+h, start_w:start_w+w, :]
 
 
 
@@ -104,29 +115,6 @@ if __name__ == "__main__":
 
     else:
             print("SKIPPING intrinsc routine...")
-            last_img_name = images[-1]
-            last_img_name = 
-            img = cv2.imread(last_img_name)
-            gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-            img_shape = gray.shape[::-1]
-            # Find the chess board corners
-            # If desired number of corners are found in the image then ret = true
-            # TODO: touchup
-            ret, corners = cv2.findChessboardCorners(gray, checkerboard, None)
-
-            """
-            If desired number of corner are detected,
-            we refine the pixel coordinates and display
-            them on the images of checker board
-            """
-            if ret == True:
-                objpoints.append(objp)
-                # refining pixel coordinates for given 2d points.
-                #print(corners)
-                corners2 = cv2.cornerSubPix(gray, corners, dW1, (-1,-1), criteria)
-
-                imgpoints.append(corners2)  
-
             intr_stuff = np.load(os.path.join(baseDir, calName, "cam_intrinsic_calib.npz"))
             mtx = intr_stuff["mtx"]
             dist = intr_stuff["dist"]            
@@ -143,6 +131,45 @@ if __name__ == "__main__":
         dist: distortion coefficients
 
     """
+
+    objpoints = []
+    imgpoints = []
+    img = cv2.imread(extr_img)
+    img = get_slice(img)
+    gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    img_shape = gray.shape[::-1]
+    # Find the chess board corners
+    # If desired number of corners are found in the image then ret = true
+    # TODO: touchup
+    ret, corners = cv2.findChessboardCorners(gray, checkerboard, None)
+
+    """
+    If desired number of corner are detected,
+    we refine the pixel coordinates and display
+    them on the images of checker board
+    """
+    if ret == True:
+        objpoints.append(objp)
+        # refining pixel coordinates for given 2d points.
+        #print(corners)
+        corners2 = cv2.cornerSubPix(gray, corners, dW1, (-1,-1), criteria)
+
+        imgpoints.append(corners2)    
+
+
+        img = cv2.drawChessboardCorners(img, checkerboard, corners2, ret)
+        resized_image = cv2.resize(img, (800, 600))
+        # cv2.imshow('img',resized_image)
+        # cv2.setWindowTitle('img', "extr showing") 
+        # cv2.waitKey(0)
+         
+    else:
+        print("could not find extrinsic chessboard")
+        #img = cv2.drawChessboardCorners(img, checkerboard, corners2, ret)
+        resized_image = cv2.resize(img, (800, 600))
+        cv2.imshow('img',resized_image)
+        cv2.setWindowTitle('img', "extr showing") 
+        cv2.waitKey(0)        
     
 
 
@@ -167,7 +194,8 @@ if __name__ == "__main__":
         print("Translation: \n")
         print(cam_T) 
 
-        color_img = cv2.imread(images[-1])
+        color_img = cv2.imread(extr_img)
+        color_img = get_slice(color_img)
         
         axis = np.float32([[0,0,0], [1,0,0], [0,1,0], [0,0,1]]).reshape(-1,3)
         axis_img = cv2.projectPoints(axis, rvec, tvec, mtx, dist)[0]
@@ -183,8 +211,8 @@ if __name__ == "__main__":
         cv2.line(color_img, (axis_img[0,0,0], axis_img[0,0,1]), (axis_img[2,0,0], axis_img[2,0,1]), (0,255,0), 2) #y
         cv2.putText(color_img, 'Z', (axis_img[3,0,0], axis_img[3,0,1]), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,0,0))
         cv2.line(color_img, (axis_img[0,0,0], axis_img[0,0,1]), (axis_img[3,0,0], axis_img[3,0,1]), (255,0,0), 2) #z
-        cv2.imshow("aaaaaaa", color_img)
-        cv2.waitKey(0)    
+        #cv2.imshow("aaaaaaa", color_img)
+        #cv2.waitKey(0)    
         print("Done! Press any key to exit")
     else:
         print("SKIPPING extrinsc routine...")
@@ -198,7 +226,18 @@ if __name__ == "__main__":
     ####PROJECTOR CALIBRATION
     #use white image
     if(not load_proj_decoded):
-        proj_gray_patterns = getImageStack(proj_images)
+        proj_gray_patterns_before = getImageStack(proj_images)
+
+        proj_gray_patterns = np.zeros((h, w, 3, len(proj_images)))
+
+        print("shape of proj_gray_patterns")
+
+        
+
+        for idx in range(len(proj_images)):
+            proj_gray_patterns[:,:,:,idx] = get_slice(proj_gray_patterns_before[:,:,:,idx])
+
+
 
         # fig, ax = plt.subplots()
         # first_img = read_img(proj_gray_patterns[0])
@@ -227,11 +266,11 @@ if __name__ == "__main__":
 
     #SHOW PROJECTOR CORRESPONDENCES!!!!
     fig, ax = plt.subplots(1, 2, figsize=((15,10)))
-    ax[0].imshow(read_img(images[-1]))
+    ax[0].imshow(get_slice(read_img(extr_img)))
     ax[0].set_title("final img")
     ax[1].imshow(decoded, cmap='jet')
     ax[1].set_title("projector decoded")
-    plt.show()
+    # plt.show()
 
     first_proj_img = read_img(proj_images[0])
     patch_half = np.ceil(first_proj_img.shape[1]/180).astype(np.int8)  #horz legth/180 <-- this is a neighboorhood of a chess corner
@@ -263,9 +302,14 @@ if __name__ == "__main__":
 
     # print("corners 2 is", corners2)
     # print("patch_half is", patch_half)
+    
+    objp = np.squeeze(objp, axis=0)
 
-    for corner in corners2:
-        print("\ncorner is", corner)
+
+    i = 0
+    for corner, objpt in zip(corners2, objp):
+        # print(f"\n corner {i} is", corner)
+        # print(f"\n objp {i} is", objp)
         #chessboard corner
         top_left_x = corner[0][0]
         top_left_y = corner[0][1]
@@ -281,42 +325,52 @@ if __name__ == "__main__":
         # cv2.waitKey(0)        
 
         for dx in range(-patch_half, patch_half):
-            print("hi")
             for dy in range(-patch_half, patch_half):
-                print("hi")
                 x = c_x + dx #column we are seeking to MATCH
                 y = c_y + dy #row value for decoded
                 
                 search_proj_col = np.where(decoded[y] - x < 10)
 
-                print("src point is (x,y):", x, y)
-                print("proj point is (x,y):", x, proj_col)
-
                 if(len(search_proj_col[0]) == 0):
-                    print(f"couldnt find column {x} for row {y} in decoded")
                     continue
                 else:
-                    proj_col = decoded[search_proj_col[0][0]]
+                    proj_col = decoded[y, search_proj_col[0][0]]
 
                 src_pts.append((x,y)) #from CAMERA
                 dst_pts.append(np.array([x, proj_col])) #where projector found it
 
         
-        print("src points are", src_pts)
-        print("dst points are", dst_pts)
+        # print("src points are", src_pts)
+        # print("dst points are", dst_pts)
+
+
+        if(len(src_pts) == 0 and len(dst_pts) == 0):
+            print(f"couldnt produce homography for corner {i}")
+            continue
         
         #after finding enough points near corner region...
-        Hcam_to_proj, inliers = cv2.findHomography(np.array(src_pts), np.array(dst_pts))
-        homo_proj_pt = Hcam_to_proj @ np.array(top_left_x,top_left_y, 1)
+        Hcam_to_proj, inliers = cv2.findHomography(np.array(src_pts), np.array(dst_pts),cv2.RANSAC, 5.0)
+        print(f"homograpy for corner{i} is \n", Hcam_to_proj)
+        if(np.any(Hcam_to_proj) is None):
+            print("could not produce homography")
+            continue
+        
+        homo_proj_pt = Hcam_to_proj @ np.array([top_left_x,top_left_y, 1])
         proj_pt = homo_proj_pt[0:2]/homo_proj_pt[2]
 
-        proj_objpoints.append(objp)
-        proj_imgpoints.append([proj_pt])
+        print("shape of objpt is", objpt.shape)
+
+        proj_objpoints.append(objpt)
+        proj_imgpoints.append(proj_pt) #the points that the projector found in image 
+
+    
+    print(f"{len(proj_objpoints)}obj points are", proj_objpoints)
+    print(f"{len(proj_imgpoints)}img points are", proj_imgpoints)
 
     
     ret, proj_mtx, proj_dist, proj_rvecs, proj_tvecs = cv2.calibrateCamera(proj_objpoints, 
                                                                            proj_imgpoints, 
-                                                                           img_shape, 
+                                                                           ((h,w)), 
                                                                            None, 
                                                                            None) 
 
