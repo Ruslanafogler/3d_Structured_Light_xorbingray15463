@@ -345,24 +345,27 @@ if __name__ == "__main__":
 
 
         if(len(src_pts) == 0 and len(dst_pts) == 0):
-            print(f"couldnt produce homography for corner {i}")
+            #print(f"couldnt produce homography for corner {i}")
+            i+=1
             continue
         
         #after finding enough points near corner region...
         Hcam_to_proj, inliers = cv2.findHomography(np.array(src_pts), np.array(dst_pts),cv2.RANSAC, 5.0)
-        print(f"homograpy for corner{i} is \n", Hcam_to_proj)
         if(np.any(Hcam_to_proj) is None):
-            print("could not produce homography")
+            #print("could not produce homography")
+            i+=1
             continue
         
+        print(f"homograpy for corner{i} is \n", Hcam_to_proj)
         homo_proj_pt = Hcam_to_proj @ np.array([top_left_x,top_left_y, 1])
         proj_pt = homo_proj_pt[0:2]/homo_proj_pt[2]
 
-        print("shape of objpt is", objpt.shape)
+        objpt = objpt[np.newaxis, np.newaxis, :]
+        proj_pt = proj_pt[np.newaxis, np.newaxis, :].astype(np.float32)
 
         proj_objpoints.append(objpt)
         proj_imgpoints.append(proj_pt) #the points that the projector found in image 
-
+        i+=1
     
     print(f"{len(proj_objpoints)}obj points are", proj_objpoints)
     print(f"{len(proj_imgpoints)}img points are", proj_imgpoints)
