@@ -41,7 +41,7 @@ def select_points(img_path):
 if __name__ == "__main__":
 
     baseDir = "./data/calib"
-    foldername = "12_15_2_calib"
+    foldername = "12_16_calib"
 
 
     
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         y, x = points[0]
 
         img = read_img(p)
-        new_path = f"{os.path.join(baseDir, foldername)}/cropped_{i}.JPG"
+        new_path = f"{os.path.join(baseDir, foldername)}/cropped/cropped_{i}.JPG"
         print("path is", new_path)
         write_image(new_path, img[y:y+2048,x:x+2048], is_float=False)
 

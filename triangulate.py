@@ -199,8 +199,18 @@ if __name__ == "__main__":
     print("point is", points)
     offsety, offsetx = points[0]
 
+
+    offsety = 918
+    offsetx = 2297
+
     # offsety = 1075
     # offsetx = 2297
+
+
+
+# Select a point to form top left corner of 2048x2048 bounding box
+# point is [array([ 918, 2297])]
+# size of final img (should be hx    
 
     FINAL_IMG = get_slice(read_img(IMG_PATHS[-1]), offsety, offsetx)
     print("size of final img (should be hx2)", FINAL_IMG.shape)
@@ -308,7 +318,6 @@ if __name__ == "__main__":
                                   cam_undist_points, 
                                   proj_undist_points)
     triag = triag.T    
-    print("shape of triag is", triag.shape)
 
     pointCloud = (triag[:,:3]/triag[:,3:])
     no_outliers_mask = (np.abs(pointCloud[:,2])) < 10
@@ -316,37 +325,42 @@ if __name__ == "__main__":
     pointCloud_color = color_pts[no_outliers_mask] 
 
     print("pointCloud is", pointCloud)
+    print("pointCloud is", pointCloud.shape)
+    print("color_pts shape is", color_pts.shape)
     ##################################################################
-
+    if(color_pts.shape[0] > pointCloud.shape[0]):
+        print("cropping color pts, it is too large somehow")
+        color_pts = color_pts[:pointCloud.shape[0], :]
+        print("color_pts shape is", color_pts.shape)
 
     ##############################################
     #RAY-PLANE INTERSECTION WAY
     ###############################################    
-    reconstructed = []
-    colors_reconstructed = []
-    for cam_pt, proj_pt in zip(cam_pts, proj_pts):
-        X = intersect_with_plane(cam_pt, proj_pt, cam_int, 
-                                 cam_dist, proj_int, 
-                                 proj_dist, stereoR, stereoT,
-                                 show_3d=False)
-        if(X.any() == None): continue
-        reconstructed.append(X)
-        colors_reconstructed.append(FINAL_IMG[cam_pt[1].astype(np.uint8), cam_pt[0].astype(np.uint8), :])
+    # reconstructed = []
+    # colors_reconstructed = []
+    # for cam_pt, proj_pt in zip(cam_pts, proj_pts):
+    #     X = intersect_with_plane(cam_pt, proj_pt, cam_int, 
+    #                              cam_dist, proj_int, 
+    #                              proj_dist, stereoR, stereoT,
+    #                              show_3d=False)
+    #     if(X.any() == None): continue
+    #     reconstructed.append(X)
+    #     colors_reconstructed.append(FINAL_IMG[cam_pt[1].astype(np.uint8), cam_pt[0].astype(np.uint8), :])
     
-    reconstructed = np.vstack(reconstructed)
-    colors_reconstructed = np.vstack(colors_reconstructed)
+    # reconstructed = np.vstack(reconstructed)
+    # colors_reconstructed = np.vstack(colors_reconstructed)
 
-    no_outliers_mask = (np.abs(reconstructed[:,2])) < 10
-    reconstructed = reconstructed[no_outliers_mask]    
-    colors_reconstructed = colors_reconstructed[no_outliers_mask]  
+    # no_outliers_mask = (np.abs(reconstructed[:,2])) < 10
+    # reconstructed = reconstructed[no_outliers_mask]    
+    # colors_reconstructed = colors_reconstructed[no_outliers_mask]  
 
-    print("shape is", reconstructed.shape)
+    # print("shape is", reconstructed.shape)
 
 
                 
 
     fig2 = plt.figure("Projected camera view")
-    ax = fig2.add_subplot(121, projection='3d')
+    ax = fig2.add_subplot(111, projection='3d')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -360,18 +374,18 @@ if __name__ == "__main__":
     ax.set_ylim(-0.5, 0.5)
     ax.set_zlim(-0.5, 0.5)
 
-    ax1 = fig2.add_subplot(122, projection='3d')
-    ax1.set_xlabel('X')
-    ax1.set_ylabel('Y')
-    ax1.set_zlabel('Z')
-    ax1.view_init(elev=270, azim=-90, roll=180)
-    C = np.array([0,0,0])  
-    ax1.scatter(C[0], C[1], C[2], s=10, marker="s")    
-    ax1.scatter(reconstructed[:,0],
-               reconstructed[:,1],
-               reconstructed[:,2],
-               c=colors_reconstructed/255.0)
-    set_axes_equal(ax)      
+    # ax1 = fig2.add_subplot(122, projection='3d')
+    # ax1.set_xlabel('X')
+    # ax1.set_ylabel('Y')
+    # ax1.set_zlabel('Z')
+    # ax1.view_init(elev=270, azim=-90, roll=180)
+    # C = np.array([0,0,0])  
+    # ax1.scatter(C[0], C[1], C[2], s=10, marker="s")    
+    # ax1.scatter(reconstructed[:,0],
+    #            reconstructed[:,1],
+    #            reconstructed[:,2],
+    #            c=colors_reconstructed/255.0)
+    # set_axes_equal(ax)      
     
     plt.show()        
 

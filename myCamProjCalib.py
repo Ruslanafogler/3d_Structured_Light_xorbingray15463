@@ -5,7 +5,8 @@ import numpy as np
 import cv2
 from util import getIMGPaths, getImageStack, classify_imgstack_codes, decode_gray, read_img, get_per_pixel_threshold
 import matplotlib.pyplot as plt
-
+import matplotlib.image as mpimg
+import matplotlib.patches as patches
 
 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 80, 0.001)
 
@@ -26,12 +27,44 @@ def get_chessboard_imgpts(img, checkerboard, dW1, show_img=False):
     cv2.destroyAllWindows()    
     return corners
 
-def get_proj_name(i):
+def get_proj_name(i, prefix, suffix):
     num = i+1
-    return f'12_15_{num}_projgray'
+    return f'{prefix}_{num}'
 
 def get_slice(img, start_y, start_x, h=2048, w=2048):
     return img[start_y: start_y+h, start_x:start_x+w, :]
+
+def select_points(img_path):
+    """
+    Displays an image and allows the user to select two points.
+    Returns the coordinates of the selected points.
+
+    Args:
+        img_path (str): Path to the image file.
+
+    Returns:
+        tuple: A tuple containing the coordinates of the two selected points.
+    """
+
+    img = mpimg.imread(img_path)
+
+    fig, ax = plt.subplots()
+    ax.imshow(img)
+
+    points = []
+
+    def onclick(event):
+        x, y = int(event.xdata), int(event.ydata)
+        points.append(np.array([y, x]))
+        rect = patches.Rectangle((x, y), 2048, 2048, linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        plt.draw()
+
+    cid = fig.canvas.mpl_connect('button_press_event', onclick)
+
+    plt.show()
+
+    return points
 
 
 if __name__ == "__main__":
@@ -40,40 +73,55 @@ if __name__ == "__main__":
     #Input data locations
     #for CAMERA calibration:
     baseDir = './data/calib/' #data directory
-    calName = '12_15_2_calib/cropped' #calibration sourse (also a dir in data)
+    calName = '12_16_calib/cropped' #calibration sourse (also a dir in data)
     projName = '12_15_projgray'
+    ambient = '12_16_normallighting_projgray'
 
-
+    proj_prefix = '12_16_projgray'
+    proj_suffix = ''
     
-    ambient = 'normal_lighting'
-    
-    image_ext = 'JPG' #file extension for images
-    skip_cam_intrinsic = True
-    load_proj_decoded = True
-    
-    useLowRes = False #enable lowres for debugging
 
-    
-    offsets = np.load("offsets.npy")
-    captures = 4
-
-
-
-    
     w = 2048
     h = 2048
 
+    captures = 4 #number of directories for projector calibration
+    image_ext = 'JPG' #file extension for images
+    skip_cam_intrinsic = True
+    load_proj_decoded = False
 
-
-
-
+    get_offsets = False
+    
 
     #Extrinsic calibration parameters
     dW1 = (8, 8) #window size for finding checkerboard corners
     checkerboard = (6, 8) #number of internal corners on checkerboard
     size_of_square = 0.0235 #in cm
 
-    normal_lighting_imgs = glob.glob(os.path.join(baseDir, ambient, "*"+image_ext))
+    normal_lighting_imgs = glob.glob(os.path.join(baseDir, ambient, "*"+image_ext))    
+    images = glob.glob(os.path.join(baseDir, calName, "*"+image_ext))
+
+    print("normal lighting paths:", normal_lighting_imgs)
+    print("camera intrinsic calib paths:", images)
+    
+    
+    if(get_offsets):
+        offsets = []
+            # Example usage:
+        for i, p in enumerate(normal_lighting_imgs):
+            print("i, p", i, p)
+            points = select_points(p)
+            print("point is", points)
+            offsets.append(points)
+            x1, y1 = points[0]
+
+        offsets = np.vstack(offsets)
+        print("offsets are", offsets)
+        np.save("offsets.npy", offsets)    
+        
+    
+    
+    offsets = np.load("offsets.npy")
+
 
 
 
@@ -82,7 +130,7 @@ if __name__ == "__main__":
     ##############################################################################################################
     ##############################################################################################################
     ##############################################################################################################
-    images = glob.glob(os.path.join(baseDir, calName, "*"+image_ext))
+    
 
     
     ################################################
@@ -169,7 +217,7 @@ if __name__ == "__main__":
 
 
     for dir_index in range(captures):
-        dir_name = get_proj_name(dir_index)
+        dir_name = get_proj_name(dir_index, proj_prefix, proj_suffix)
         print("USING", dir_name)
         proj_images = glob.glob(os.path.join(baseDir, dir_name, "*"+image_ext))
         offset = offsets[dir_index,:]
@@ -211,7 +259,7 @@ if __name__ == "__main__":
         ax[0].set_title("final img")
         ax[1].imshow(decoded, cmap='jet')
         ax[1].set_title("projector decoded")
-        # plt.show() 
+        plt.show() 
 
         first_proj_img = read_img(proj_images[0])
         patch_half = np.ceil(2048/180).astype(np.int8)  #horz legth/180 <-- this is a neighboorhood of a chess corner
@@ -275,7 +323,7 @@ if __name__ == "__main__":
                     src_pts.append((x,y)) #from CAMERA
                     dst_pts.append(np.array([proj_col, y])) #where projector found it
             
-            if(len(src_pts) == 0 and len(dst_pts) == 0):
+            if(len(src_pts) < 4 and len(dst_pts) < 4):
                 print("2")
                 continue          
 
@@ -308,6 +356,10 @@ if __name__ == "__main__":
         ax1[1].scatter(TEST_PTS[:,0], TEST_PTS[:,1], color='red', s=50)
         ax1[1].set_title("projector decoded")
         plt.show()       
+
+        if(len(proj_objps) < 4):
+            print("insufficient points for calibration, skipping")
+            continue
 
         proj_objps_list.append(np.float32(proj_objps))
         proj_imgpts_list.append(np.float32(proj_imgpoints))
@@ -387,8 +439,8 @@ if __name__ == "__main__":
     print(F)      
 
     np.savez(os.path.join(baseDir, calName, "stereo.npz"), 
-             cam_int=proj_mtx, 
-             cam_dist=proj_dist,
+             cam_int=cam_int, 
+             cam_dist=cam_dist,
              proj_int=proj_int,
              proj_dist=proj_dist,
              stereoR=stereoR,
