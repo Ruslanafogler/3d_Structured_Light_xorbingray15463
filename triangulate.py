@@ -38,46 +38,47 @@ def pixel2ray(points, mtx, dist):
 def get_ray_plane_intersection(ray, ray_pt, plane_pt, normal):
     normal_dot_ray = np.dot(normal, ray)
     if(normal_dot_ray < 1e-6):
-        print("uhoh, ray/plane are parallel")
         return np.array([None] * 3)
     
     t = np.dot(normal, plane_pt-ray_pt)/normal_dot_ray
     return ray*t + ray_pt
 
 
-def intersect_with_plane(pixel, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT):
+def intersect_with_plane(cam_pixel, proj_pixel, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT, show_3d=False):
     
     #from C = (0,0,0)
     cam_center = np.zeros((3,1))
-    cam_rays = np.squeeze(pixel2ray(pixel, cam_int, cam_dist))
+    cam_rays = np.squeeze(pixel2ray(cam_pixel, cam_int, cam_dist))
     #to get SL light plane...
     proj_center = stereoR @ (cam_center-stereoT)
     #do I need to convert this to camera space with R, T?
-    proj_rays = np.squeeze(pixel2ray(pixel, proj_int, proj_dist))
+    proj_rays = np.squeeze(pixel2ray(proj_pixel, proj_int, proj_dist))
     proj_rays = stereoR @ (proj_rays) #questioning this line
-    SL_plane_normal = np.cross(proj_rays, np.array([0,0,1]))
+    proj_z_up = stereoR @ np.array([0,0,1])
+    SL_plane_normal = np.cross(proj_rays, proj_z_up)
     proj_rays = np.squeeze(proj_rays)
 
 
-    # # Camera positions
-    # camera1_pos = np.array([0, 0, 0])  # Assuming camera 1 as origin
-    # camera2_pos = stereoR @ (camera1_pos-stereoT)
-    # # Plot the cameras
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(camera1_pos[0], camera1_pos[1], camera1_pos[2], color='blue', label='Camera')
-    # ax.quiver(camera1_pos[0], camera1_pos[1], camera1_pos[2],
-    #           cam_rays[0], cam_rays[1], cam_rays[2], 
-    #           color='blue', label='Camera Rays')
-    # ax.scatter(camera2_pos[0], camera2_pos[1], camera2_pos[2], color='red', label='Projector')
-    # ax.quiver(camera2_pos[0], camera2_pos[1], camera2_pos[2], 
-    #           proj_rays[0], proj_rays[1], proj_rays[2], 
-    #           color='red', label='Projector Rays')
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # plt.legend()
-    # plt.show()
+    if(show_3d):
+        # Camera positions
+        camera1_pos = np.array([0, 0, 0])  # Assuming camera 1 as origin
+        camera2_pos = stereoR @ (camera1_pos-stereoT)
+        # Plot the cameras
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(camera1_pos[0], camera1_pos[1], camera1_pos[2], color='blue', label='Camera')
+        ax.quiver(camera1_pos[0], camera1_pos[1], camera1_pos[2],
+                cam_rays[0], cam_rays[1], cam_rays[2], 
+                color='blue', label='Camera Rays')
+        ax.scatter(camera2_pos[0], camera2_pos[1], camera2_pos[2], color='red', label='Projector')
+        ax.quiver(camera2_pos[0], camera2_pos[1], camera2_pos[2], 
+                proj_rays[0], proj_rays[1], proj_rays[2], 
+                color='red', label='Projector Rays')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.legend()
+        plt.show()
 
 
     intersection = get_ray_plane_intersection(cam_rays, np.squeeze(cam_center), np.squeeze(proj_center), SL_plane_normal)
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     calName = '12_15_calib' #calibration sourse (also a dir in data)
 
     dataDir = './data' #data directory
-    patternDir = 'gray' #calibration sourse (also a dir in data)   
+    patternDir = 'binary' #calibration sourse (also a dir in data)   
     image_ext="JPG" 
     load_proj_decoded = True
 
@@ -136,6 +137,7 @@ if __name__ == "__main__":
 
 
     IMG_PATHS = glob.glob(os.path.join(dataDir, patternDir,"*"+image_ext))
+    FINAL_IMG = get_slice(read_img(IMG_PATHS[-1]), offsety, offsetx)
     print("IMG paths", IMG_PATHS)
 
     if(not load_proj_decoded):
@@ -160,7 +162,7 @@ if __name__ == "__main__":
 
     #SHOW PROJECTOR CORRESPONDENCES!!!!
     fig, ax = plt.subplots(1, 2, figsize=((15,10)))
-    ax[0].imshow(get_slice(read_img(IMG_PATHS[-1]), offsety, offsetx))
+    ax[0].imshow(FINAL_IMG)
     ax[0].set_title("final img")
     ax[1].imshow(decoded, cmap='jet')
     ax[1].set_title("projector decoded")
@@ -168,68 +170,113 @@ if __name__ == "__main__":
 
 
 
+    n = 10 #downsample by
+    i = 0
+    
+    show_correspondence = False
+
+    cam_pts = []
+    proj_pts = []
+    color_pts = []
+    for x in range(0, w, n):
+        for y in range(0, h, n):
+            tolerance_search = 10
+            search_proj_col = np.where(np.abs(decoded[y,:] - x) < tolerance_search)
+
+            i+=1
+            if(len(search_proj_col[0]) == 0):
+                #print("1")
+                continue
+            else:
+                proj_col = decoded[y, search_proj_col[0][0]]
+
+            color_pts.append(FINAL_IMG[y,x,:])
+            cam_pts.append(np.array([x,y])) #from CAMERA
+            proj_pts.append(np.array([proj_col, y])) #where projector found it
+            if(i%1000 == 0 and show_correspondence):
+                fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
+                ax1[0].imshow(FINAL_IMG)
+                ax1[0].set_title("final img")
+                ax1[0].scatter(x, y, color='red', s=50)
+                
+                ax1[1].imshow(decoded, cmap='jet')
+                ax1[1].scatter(proj_col, y, color='red', s=50)
+                ax1[1].set_title("projector decoded")
+                plt.show()             
+            
+
+    proj_pts = np.vstack(proj_pts).astype(np.float32)
+    cam_pts = np.vstack(cam_pts).astype(np.float32)
+    color_pts = np.vstack(color_pts).astype(np.float32)
+    
+    if(show_correspondence):
+        fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
+        ax1[0].imshow(FINAL_IMG)
+        ax1[0].set_title("final img")
+        ax1[0].scatter(cam_pts[:,0], cam_pts[:,1], color='red', s=50)
+        
+        ax1[1].imshow(decoded, cmap='jet')
+        ax1[1].scatter(proj_pts[:,0], proj_pts[:,1], color='red', s=50)
+        ax1[1].set_title("projector decoded")
+        plt.show()   
 
 
-
-
-    n = 20 #downsample by
-
-
-    x = np.arange(0, 2048, n)
-    y = np.arange(0, 2048, n)
-    xv, yv = np.meshgrid(x, y)
-    pts = np.stack((xv.ravel(), yv.ravel()), axis=-1).astype(np.float32)
-
-    color = get_slice(read_img(IMG_PATHS[-1]), offsety, offsetx)
-    print("shape of colors", color.shape)
-
-    ###TRIANGULATE VIA STEREO
-
-    print("pts.shape is", pts.shape)
+    print("shape of proj, cam", proj_pts.shape, cam_pts.shape)
     
 
     ##############################################
     #OPENCV WAY
     ###############################################
-    # proj_undist_points = cv2.undistortPoints(pts, proj_int, proj_dist)    
-    # cam_undist_points = cv2.undistortPoints(pts, cam_int, cam_dist)   
+    proj_undist_points = cv2.undistortPoints(proj_pts, proj_int, proj_dist)    
+    cam_undist_points = cv2.undistortPoints(cam_pts, cam_int, cam_dist)   
 
-    # perspective_cam = np.array([[1.0,0,0,0],
-    #                             [0,1.0,0,0],
-    #                             [0,0,1.0,0]])
+    perspective_cam = np.array([[1.0,0,0,0],
+                                [0,1.0,0,0],
+                                [0,0,1.0,0]])
     
-    # perspective_proj = np.hstack((stereoR, stereoT))
+    perspective_proj = np.hstack((stereoR, stereoT))
 
-    # triag = cv2.triangulatePoints(perspective_cam, 
-    #                               perspective_proj, 
-    #                               cam_undist_points.reshape(2,-1), 
-    #                               proj_undist_points.reshape(2,-1))
-    # triag = triag.T    
-    # print("shape of triag is", triag.shape)
+    triag = cv2.triangulatePoints(perspective_cam, 
+                                  perspective_proj, 
+                                  cam_undist_points.reshape(2,-1), 
+                                  proj_undist_points.reshape(2,-1))
+    triag = triag.T    
+    print("shape of triag is", triag.shape)
 
-    # pointCloud = (triag[:,:3]/triag[:,3:])
-    # pointCloud = pointCloud.reshape((x.shape[0],y.shape[0],3))
+    pointCloud = (triag[:,:3]/triag[:,3:])
+    no_outliers_mask = (np.abs(pointCloud[:,2])) < 8
+    pointCloud = pointCloud[no_outliers_mask]   
+    pointCloud_color = color_pts[no_outliers_mask] 
 
-    # print("shape of pointCloud is", pointCloud.shape)
+    print("pointCloud is", pointCloud)
     ##################################################################
 
-    pointCloud = np.zeros((y.shape[0], x.shape[0], 3))
-    
-    
-    for pt in pts:
-        X = intersect_with_plane(pt, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT)
+
+    ##############################################
+    #RAY-PLANE INTERSECTION WAY
+    ###############################################    
+    reconstructed = []
+    colors_reconstructed = []
+    for cam_pt, proj_pt in zip(cam_pts, proj_pts):
+        X = intersect_with_plane(cam_pt, proj_pt, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT)
         if(X.any() == None): continue
-        print("shape of X is", X.shape)
-        if(X[2] < 0 and np.abs(X[2]) < 10):
-            print("depth at pixel", pt//n, "is", X[2])
-            pixel = pt.astype(np.uint8)
-            pointCloud[pixel[1]//n, pixel[0]//n] = X[2]
+        reconstructed.append(X)
+        colors_reconstructed.append(FINAL_IMG[cam_pt[1].astype(np.uint8), cam_pt[0].astype(np.uint8), :])
+    
+    reconstructed = np.vstack(reconstructed)
+    colors_reconstructed = np.vstack(colors_reconstructed)
+
+    no_outliers_mask = (np.abs(reconstructed[:,2])) < 10
+    reconstructed = reconstructed[no_outliers_mask]    
+    colors_reconstructed = colors_reconstructed[no_outliers_mask]  
+
+    print("shape is", reconstructed.shape)
 
 
                 
 
     fig2 = plt.figure("Projected camera view")
-    ax = fig2.add_subplot(111, projection='3d')
+    ax = fig2.add_subplot(121, projection='3d')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -238,8 +285,22 @@ if __name__ == "__main__":
     ax.scatter(C[0], C[1], C[2], s=10, marker="s")    
     ax.scatter(pointCloud[:,0],
                pointCloud[:,1],
-               pointCloud[:,2])
+               pointCloud[:,2],
+               c=pointCloud_color/255.0)
     set_axes_equal(ax)  
+
+    ax1 = fig2.add_subplot(122, projection='3d')
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_zlabel('Z')
+    ax1.view_init(elev=270, azim=-90, roll=180)
+    C = np.array([0,0,0])  
+    ax1.scatter(C[0], C[1], C[2], s=10, marker="s")    
+    ax1.scatter(reconstructed[:,0],
+               reconstructed[:,1],
+               reconstructed[:,2],
+               c=colors_reconstructed/255.0)
+    set_axes_equal(ax)      
     
     plt.show()        
 

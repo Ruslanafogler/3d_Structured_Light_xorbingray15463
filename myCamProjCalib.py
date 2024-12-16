@@ -39,8 +39,8 @@ if __name__ == "__main__":
 
     #Input data locations
     #for CAMERA calibration:
-    baseDir = './data/calib' #data directory
-    calName = '12_15_calib' #calibration sourse (also a dir in data)
+    baseDir = './data/calib/' #data directory
+    calName = '12_15_2_calib/cropped' #calibration sourse (also a dir in data)
     projName = '12_15_projgray'
 
 
@@ -278,26 +278,7 @@ if __name__ == "__main__":
             if(len(src_pts) == 0 and len(dst_pts) == 0):
                 print("2")
                 continue          
-            #after finding enough points near corner region...
-            #############GET HOMOGRAPHY#########################
-            # if(corner_index % 8 == 0):
-            #     dst_pts = np.vstack(dst_pts)
-            #     print("dst point is", dst_pts[0,:])
-            #     fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
-            #     ax1[0].imshow(cam_ref_img)
-            #     ax1[0].set_title("final img")
-            #     ax1[0].scatter(c_x, c_y, color='red', s=50)
-            #     ax1[1].imshow(decoded, cmap='jet')
-            #     ax1[1].scatter(dst_pts[:,0], dst_pts[:,1], color='red', s=50)
-            #     ax1[1].set_title("projector decoded")
-            #     plt.show() 
-            
-            # dst_pts = np.vstack(dst_pts)
-            # plt.imshow(decoded, cmap='jet')  
-            # plt.scatter(dst_pts[:,1], dst_pts[:,0], color='red', s=50)
-            # plt.show()                
-            
-            
+
             Hcam_to_proj, inliers = cv2.findHomography(np.array(src_pts), np.array(dst_pts),cv2.RANSAC, 5.0)
             if(np.any(Hcam_to_proj) is None):
                 #print("could not produce homography")
