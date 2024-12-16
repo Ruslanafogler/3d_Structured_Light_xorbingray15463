@@ -9,7 +9,8 @@ from tqdm import tqdm
 import pickle
 from util import decode, getImageStack, classify_imgstack_codes, get_per_pixel_threshold, read_img
 import glob
-
+import matplotlib.image as mpimg
+import matplotlib.patches as patches
 
 def get_center_slice(img, h=2048, w=2048):
     img_shape = img.shape
@@ -50,7 +51,7 @@ def intersect_with_plane(cam_pixel, proj_pixel, cam_int, cam_dist, proj_int, pro
     cam_center = np.zeros((3,1))
     cam_rays = np.squeeze(pixel2ray(cam_pixel, cam_int, cam_dist))
     #to get SL light plane...
-    proj_center = stereoR @ (cam_center-stereoT)
+    proj_center = stereoR @ (cam_center - stereoT)
     #do I need to convert this to camera space with R, T?
     proj_rays = np.squeeze(pixel2ray(proj_pixel, proj_int, proj_dist))
     proj_rays = stereoR @ (proj_rays) #questioning this line
@@ -91,6 +92,38 @@ def intersect_with_plane(cam_pixel, proj_pixel, cam_int, cam_dist, proj_int, pro
 
 
     
+    
+def select_points(img_path):
+    """
+    Displays an image and allows the user to select two points.
+    Returns the coordinates of the selected points.
+
+    Args:
+        img_path (str): Path to the image file.
+
+    Returns:
+        tuple: A tuple containing the coordinates of the two selected points.
+    """
+
+    img = mpimg.imread(img_path)
+
+    fig, ax = plt.subplots()
+    ax.imshow(img)
+
+    points = []
+
+    def onclick(event):
+        x, y = int(event.xdata), int(event.ydata)
+        points.append(np.array([y, x]))
+        rect = patches.Rectangle((x, y), 2048, 2048, linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        plt.draw()
+
+    cid = fig.canvas.mpl_connect('button_press_event', onclick)
+
+    plt.show()
+
+    return points
 
 
 
@@ -99,24 +132,24 @@ if __name__ == "__main__":
     
     
     baseDir = './data/calib' #data directory
-    calName = '12_15_calib' #calibration sourse (also a dir in data)
+    calName = '12_16_calib/cropped' #calibration sourse (also a dir in data)
 
     dataDir = './data' #data directory
-    patternDir = 'binary' #calibration sourse (also a dir in data)   
+    patternDir = 'gray' #calibration sourse (also a dir in data) 
+    subPatternDir = 'gray_12_16'  
     image_ext="JPG" 
-    load_proj_decoded = True
+    load_proj_decoded = False
 
     h = 2048
     w = 2048
 
-    offsety = 1075
-    offsetx = 2297
+
     #form a 2048x2048 bounding box around bird following this offset 
 
     #bird offset 1075, 2297]
 
 
-    
+    IMG_PATHS = glob.glob(os.path.join(dataDir, patternDir,subPatternDir, "*"+image_ext))
     ###############################################################
     ###############################################################
     ###############################################################
@@ -135,9 +168,42 @@ if __name__ == "__main__":
     E = stereo_stuff['E']
     F = stereo_stuff['F']
 
+    print("STEREO CALIBRATED PARAMETERS!")
+    print("CAM INTRINSIC:")
+    print("camera matrix: \n")
+    print(cam_int)
+    print("Distortion: \n")
+    print(cam_dist)         
 
-    IMG_PATHS = glob.glob(os.path.join(dataDir, patternDir,"*"+image_ext))
+    print("PROJ INTRINSIC:")
+    print("Projector matrix: \n")
+    print(proj_int)
+    print("Distortion: \n")
+    print(proj_dist)     
+
+    print("stereo R, T:")
+    print("R \n")
+    print(stereoR)
+    print("T \n")
+    print(stereoT)   
+
+    print("Essential matrix: \n")
+    print(E)
+    print("Fundamental matrix: \n")
+    print(F)   
+
+
+    print("\n\n")
+    print("Select a point to form top left corner of 2048x2048 bounding box")
+    points = select_points(IMG_PATHS[-1])
+    print("point is", points)
+    offsety, offsetx = points[0]
+
+    # offsety = 1075
+    # offsetx = 2297
+
     FINAL_IMG = get_slice(read_img(IMG_PATHS[-1]), offsety, offsetx)
+    print("size of final img (should be hx2)", FINAL_IMG.shape)
     print("IMG paths", IMG_PATHS)
 
     if(not load_proj_decoded):
@@ -166,21 +232,21 @@ if __name__ == "__main__":
     ax[0].set_title("final img")
     ax[1].imshow(decoded, cmap='jet')
     ax[1].set_title("projector decoded")
-    #plt.show() 
+    plt.show() 
 
 
 
     n = 10 #downsample by
     i = 0
     
-    show_correspondence = False
+    show_correspondence = True
 
     cam_pts = []
     proj_pts = []
     color_pts = []
     for x in range(0, w, n):
         for y in range(0, h, n):
-            tolerance_search = 10
+            tolerance_search = 8
             search_proj_col = np.where(np.abs(decoded[y,:] - x) < tolerance_search)
 
             i+=1
@@ -193,7 +259,8 @@ if __name__ == "__main__":
             color_pts.append(FINAL_IMG[y,x,:])
             cam_pts.append(np.array([x,y])) #from CAMERA
             proj_pts.append(np.array([proj_col, y])) #where projector found it
-            if(i%1000 == 0 and show_correspondence):
+            
+            if(i%1000000 == 0 and show_correspondence):
                 fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
                 ax1[0].imshow(FINAL_IMG)
                 ax1[0].set_title("final img")
@@ -205,7 +272,7 @@ if __name__ == "__main__":
                 plt.show()             
             
 
-    proj_pts = np.vstack(proj_pts).astype(np.float32)
+    proj_pts = np.vstack(proj_pts).astype(np.float32)   
     cam_pts = np.vstack(cam_pts).astype(np.float32)
     color_pts = np.vstack(color_pts).astype(np.float32)
     
@@ -230,21 +297,21 @@ if __name__ == "__main__":
     proj_undist_points = cv2.undistortPoints(proj_pts, proj_int, proj_dist)    
     cam_undist_points = cv2.undistortPoints(cam_pts, cam_int, cam_dist)   
 
-    perspective_cam = np.array([[1.0,0,0,0],
-                                [0,1.0,0,0],
-                                [0,0,1.0,0]])
+    perspective_cam = np.array([[1.0, 0,   0,   0],
+                                [0,   1.0, 0,   0],
+                                [0,   0,   1.0, 0]])
     
     perspective_proj = np.hstack((stereoR, stereoT))
 
-    triag = cv2.triangulatePoints(perspective_cam, 
+    triag = cv2.triangulatePoints(perspective_cam,
                                   perspective_proj, 
-                                  cam_undist_points.reshape(2,-1), 
-                                  proj_undist_points.reshape(2,-1))
+                                  cam_undist_points, 
+                                  proj_undist_points)
     triag = triag.T    
     print("shape of triag is", triag.shape)
 
     pointCloud = (triag[:,:3]/triag[:,3:])
-    no_outliers_mask = (np.abs(pointCloud[:,2])) < 8
+    no_outliers_mask = (np.abs(pointCloud[:,2])) < 10
     pointCloud = pointCloud[no_outliers_mask]   
     pointCloud_color = color_pts[no_outliers_mask] 
 
@@ -258,7 +325,10 @@ if __name__ == "__main__":
     reconstructed = []
     colors_reconstructed = []
     for cam_pt, proj_pt in zip(cam_pts, proj_pts):
-        X = intersect_with_plane(cam_pt, proj_pt, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT)
+        X = intersect_with_plane(cam_pt, proj_pt, cam_int, 
+                                 cam_dist, proj_int, 
+                                 proj_dist, stereoR, stereoT,
+                                 show_3d=False)
         if(X.any() == None): continue
         reconstructed.append(X)
         colors_reconstructed.append(FINAL_IMG[cam_pt[1].astype(np.uint8), cam_pt[0].astype(np.uint8), :])
@@ -280,14 +350,15 @@ if __name__ == "__main__":
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    ax.view_init(elev=270, azim=-90, roll=180)
     C = np.array([0,0,0])  
     ax.scatter(C[0], C[1], C[2], s=10, marker="s")    
     ax.scatter(pointCloud[:,0],
                pointCloud[:,1],
                pointCloud[:,2],
-               c=pointCloud_color/255.0)
-    set_axes_equal(ax)  
+               c=color_pts/255.0)
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_ylim(-0.5, 0.5)
+    ax.set_zlim(-0.5, 0.5)
 
     ax1 = fig2.add_subplot(122, projection='3d')
     ax1.set_xlabel('X')
