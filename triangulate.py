@@ -22,7 +22,8 @@ def get_I_lumn(I, has_4_channels=False):
 
 def get_per_pixel_threshold(img_stack):
     #y,x,(rgb), # of images
-    return np.mean(img_stack, axis=2)
+    gray_img_stack = get_I_lumn(img_stack, has_4_channels=True)
+    return np.mean(gray_img_stack, axis=2)
 
 
 def classify_imgstack_codes(img_stack, threshold, test_pattern=False):
@@ -290,10 +291,19 @@ def main():
     # bin_codes = classify_imgstack_codes(bin_patterns, threshold=127.0)
     # decoded2 = decode_binary(bin_codes)
 
-    xor_patterns = getIMGPaths("./patterns/xor", ".tiff")
-    xor_patterns = getImageStack(xor_patterns)
-    xor_codes = classify_imgstack_codes(xor_patterns, threshold=127.0, test_pattern=True)
-    decoded1 = decode_xor(xor_codes)    
+    # xor_patterns = getIMGPaths("./patterns/xor", ".tiff")
+    # xor_patterns = getImageStack(xor_patterns)
+    # xor_codes = classify_imgstack_codes(xor_patterns, threshold=127.0, test_pattern=True)
+    # decoded1 = decode_xor(xor_codes)    
+
+
+
+
+    
+    patterns = getIMGPaths("./data/calib/12_14_birdxor", ".JPG")
+    patterns = getImageStack(patterns)
+    codes = classify_imgstack_codes(patterns, threshold=127.0, test_pattern=False)
+    decoded1 = decode_binary(codes)
 
     # plt.imshow(decoded2, cmap='jet')
     # plt.title("binary")
