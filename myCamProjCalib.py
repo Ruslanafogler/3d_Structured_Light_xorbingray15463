@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     
     offsets = np.load("offsets.npy")
-    captures = 5
+    captures = 4
 
 
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
                     x = c_x + dx #column we are seeking to MATCH
                     y = c_y + dy #row value for decoded
                     
-                    tolerance_search = 5
+                    tolerance_search = 10
                     search_proj_col = np.where(np.abs(decoded[y,:] - x) < tolerance_search)
                     if(len(search_proj_col[0]) == 0):
                         print("1")
@@ -318,7 +318,16 @@ if __name__ == "__main__":
             #only add camera point if projector was found!!!!
         
 
-        
+        TEST_PTS = np.vstack(TEST_PTS)
+        fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
+        ax1[0].imshow(cam_ref_img)
+        ax1[0].set_title("final img")
+        ax1[0].scatter(c_x, c_y, color='red', s=50)
+        ax1[1].imshow(decoded, cmap='jet')
+        ax1[1].scatter(TEST_PTS[:,0], TEST_PTS[:,1], color='red', s=50)
+        ax1[1].set_title("projector decoded")
+        plt.show()       
+
         proj_objps_list.append(np.float32(proj_objps))
         proj_imgpts_list.append(np.float32(proj_imgpoints))
         
