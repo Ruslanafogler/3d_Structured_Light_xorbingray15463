@@ -3,12 +3,13 @@ import os
 import glob
 import numpy as np
 import cv2
-from triangulate import getIMGPaths, getImageStack, classify_imgstack_codes, decode_gray, read_img, get_per_pixel_threshold
+from util import getIMGPaths, getImageStack, classify_imgstack_codes, decode_gray, read_img, get_per_pixel_threshold
 import matplotlib.pyplot as plt
 
 
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 80, 0.001)
 
-def get_chessboard_imgpts(img, checkerboard, dW1):
+def get_chessboard_imgpts(img, checkerboard, dW1, show_img=False):
     gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     ret, corners = cv2.findChessboardCorners(gray, checkerboard, None)
     if ret == True:
@@ -16,12 +17,21 @@ def get_chessboard_imgpts(img, checkerboard, dW1):
         img = cv2.drawChessboardCorners(img, checkerboard, corners, ret)
     else:
         print("error: checkerboard not found")
-    resized_image = cv2.resize(img, (800, 600))
-    cv2.imshow('img',resized_image)
-    cv2.setWindowTitle('img', "chessboard") 
-    cv2.waitKey(0)
+
+    if(show_img):
+        resized_image = cv2.resize(img, (800, 600))
+        cv2.imshow('img',resized_image)
+        cv2.setWindowTitle('img', "chessboard") 
+        cv2.waitKey(0)
     cv2.destroyAllWindows()    
     return corners
+
+def get_proj_name(i):
+    num = i+1
+    return f'12_15_{num}_projgray'
+
+def get_slice(img, start_y, start_x, h=2048, w=2048):
+    return img[start_y: start_y+h, start_x:start_x+w, :]
 
 
 if __name__ == "__main__":
@@ -33,15 +43,12 @@ if __name__ == "__main__":
     calName = '12_15_calib' #calibration sourse (also a dir in data)
     projName = '12_15_projgray'
 
-    def get_proj_name(i):
-        num = i+1
-        return f'12_15_{num}_projgray'
+
     
     ambient = 'normal_lighting'
     
     image_ext = 'JPG' #file extension for images
     skip_cam_intrinsic = True
-    skip_cam_extrinsic = True
     load_proj_decoded = True
     
     useLowRes = False #enable lowres for debugging
@@ -57,8 +64,7 @@ if __name__ == "__main__":
     h = 2048
 
 
-    def get_slice(img, start_y, start_x, h=2048, w=2048):
-        return img[start_y: start_y+h, start_x:start_x+w, :]
+
 
 
 
@@ -82,7 +88,7 @@ if __name__ == "__main__":
     ################################################
     ################################################
     ################################################
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 80, 0.001)
+
 
     # Creating vector to store vectors of 3D points for each checkerboard image
     objpoints = []
@@ -155,54 +161,11 @@ if __name__ == "__main__":
     print("Distortion: \n")
     print(dist) 
 
-    if(not skip_cam_extrinsic):
-
-        corners2 = get_chessboard_imgpts(cv2.imread(images[-1]), checkerboard, dW1)
-
-        ret, rvec, tvec = cv2.solvePnP(objp, corners2, mtx, dist)
-        cam_R = cv2.Rodrigues(rvec)[0]
-        cam_T = tvec.ravel()
-
-        print("EXTRINSIC PARAMETERS:")
-        print("Camera matrix: \n")
-        print(cam_R)
-        print("Translation: \n")
-        print(cam_T) 
-
-        color_img = cv2.imread(images[-1])
-        color_img = get_slice(color_img)
-        
-        axis = np.float32([[0,0,0], [1,0,0], [0,1,0], [0,0,1]]).reshape(-1,3)
-        axis_img = cv2.projectPoints(axis, rvec, tvec, mtx, dist)[0]
-        #print("projected points: ", axis_img)
-
-        axis_img = axis_img.astype(int)
-
-        np.savez(os.path.join(baseDir, calName, "cam_extrinsic_calib.npz"), R=cam_R, T=cam_T)
-        #cv2.namedWindow('Result')
-        cv2.putText(color_img, 'X', (axis_img[1,0,0], axis_img[1,0,1]), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,255))
-        cv2.line(color_img, (axis_img[0,0,0], axis_img[0,0,1]), (axis_img[1,0,0], axis_img[1,0,1]), (0,0,255), 2) #x
-        cv2.putText(color_img, 'Y', (axis_img[2,0,0], axis_img[2,0,1]), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0))
-        cv2.line(color_img, (axis_img[0,0,0], axis_img[0,0,1]), (axis_img[2,0,0], axis_img[2,0,1]), (0,255,0), 2) #y
-        cv2.putText(color_img, 'Z', (axis_img[3,0,0], axis_img[3,0,1]), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,0,0))
-        cv2.line(color_img, (axis_img[0,0,0], axis_img[0,0,1]), (axis_img[3,0,0], axis_img[3,0,1]), (255,0,0), 2) #z
-        #cv2.imshow("aaaaaaa", color_img)
-        #cv2.waitKey(0)    
-        print("Done! Press any key to exit")
-    else:
-        print("SKIPPING extrinsc routine...")
-        extr_stuff = np.load(os.path.join(baseDir, calName, "cam_extrinsic_calib.npz"))
-        cam_R = extr_stuff["R"]
-        cam_T = extr_stuff["T"]     
-
-
     proj_objps_list = []
     proj_imgpts_list = []
 
     cam_objps_list = []
     cam_imgpts_list = []    
-
-
 
 
     for dir_index in range(captures):
@@ -248,7 +211,7 @@ if __name__ == "__main__":
         ax[0].set_title("final img")
         ax[1].imshow(decoded, cmap='jet')
         ax[1].set_title("projector decoded")
-        plt.show() 
+        # plt.show() 
 
         first_proj_img = read_img(proj_images[0])
         patch_half = np.ceil(2048/180).astype(np.int8)  #horz legth/180 <-- this is a neighboorhood of a chess corner
@@ -274,7 +237,7 @@ if __name__ == "__main__":
         https://github.com/kamino410/procam-calibration/blob/main/calibrate.py#L156 
         '''
 
-
+        TEST_PTS = []
         print("STARTING POINT SEARCH!!! for dir", dir_index)
         for corner_index in range(len(cam_corners)):
             objpt = objp[0][corner_index]
@@ -289,7 +252,10 @@ if __name__ == "__main__":
             # Display the image
             # cv2.rectangle(cam_ref_img, (c_x-patch_half, c_y-patch_half), (c_x+patch_half, c_y+patch_half), (0, 255, 0), 2)
             # cv2.imshow("Image with Rectangle", cam_ref_img)
-            # cv2.waitKey(0)        
+            # cv2.waitKey(0)   
+            # 
+
+            print("searching roughly for corner (x,y)", c_x, c_y)     
 
             #############GET HOMOGRAPHY#########################
             print("finding homography...")
@@ -298,8 +264,8 @@ if __name__ == "__main__":
                     x = c_x + dx #column we are seeking to MATCH
                     y = c_y + dy #row value for decoded
                     
-                    search_proj_col = np.where(decoded[y] - x < 350)
-
+                    tolerance_search = 5
+                    search_proj_col = np.where(np.abs(decoded[y,:] - x) < tolerance_search)
                     if(len(search_proj_col[0]) == 0):
                         print("1")
                         continue
@@ -307,13 +273,31 @@ if __name__ == "__main__":
                         proj_col = decoded[y, search_proj_col[0][0]]
 
                     src_pts.append((x,y)) #from CAMERA
-                    dst_pts.append(np.array([x, proj_col])) #where projector found it
+                    dst_pts.append(np.array([proj_col, y])) #where projector found it
             
             if(len(src_pts) == 0 and len(dst_pts) == 0):
                 print("2")
                 continue          
             #after finding enough points near corner region...
             #############GET HOMOGRAPHY#########################
+            # if(corner_index % 8 == 0):
+            #     dst_pts = np.vstack(dst_pts)
+            #     print("dst point is", dst_pts[0,:])
+            #     fig, ax1 = plt.subplots(1, 2, figsize=((15,10)))
+            #     ax1[0].imshow(cam_ref_img)
+            #     ax1[0].set_title("final img")
+            #     ax1[0].scatter(c_x, c_y, color='red', s=50)
+            #     ax1[1].imshow(decoded, cmap='jet')
+            #     ax1[1].scatter(dst_pts[:,0], dst_pts[:,1], color='red', s=50)
+            #     ax1[1].set_title("projector decoded")
+            #     plt.show() 
+            
+            # dst_pts = np.vstack(dst_pts)
+            # plt.imshow(decoded, cmap='jet')  
+            # plt.scatter(dst_pts[:,1], dst_pts[:,0], color='red', s=50)
+            # plt.show()                
+            
+            
             Hcam_to_proj, inliers = cv2.findHomography(np.array(src_pts), np.array(dst_pts),cv2.RANSAC, 5.0)
             if(np.any(Hcam_to_proj) is None):
                 #print("could not produce homography")
@@ -323,21 +307,23 @@ if __name__ == "__main__":
             homo_proj_pt = Hcam_to_proj @ np.array([corner_x,corner_y, 1])
             proj_pt = homo_proj_pt[0:2]/homo_proj_pt[2]
 
+            TEST_PTS.append(proj_pt)
+
             proj_objps.append(objpt)
             proj_imgpoints.append([proj_pt]) #the points that the projector found in image 
 
             cam_2objps.append(objpt)
-            cam_2imgpoints.append([np.array(corner_x, corner_y)])               
+            cam_2imgpoints.append([np.array([corner_x, corner_y])])               
             
             #only add camera point if projector was found!!!!
         
-        print("found points:", len(proj_objps))
+
         
         proj_objps_list.append(np.float32(proj_objps))
         proj_imgpts_list.append(np.float32(proj_imgpoints))
         
-        cam_objps_list.append(objp)
-        cam_imgpts_list.append(cam_corners)   
+        cam_objps_list.append(np.float32(cam_2objps))
+        cam_imgpts_list.append(np.float32(cam_2imgpoints))   
         
 
     
@@ -377,38 +363,47 @@ if __name__ == "__main__":
     dist = intr_stuff["dist"]    
 
 
-    ret, cam_int, cam_dist, proj_int, proj_dist, cam_proj_rmat, cam_proj_tvec, E, F = cv2.stereoCalibrate(
-        proj_objps_list, cam_2imgpoints, proj_imgpts_list, mtx, dist, proj_mtx, proj_dist, None)  
+    print("some basic checks...")
+    print("proj objpts list is", len(proj_objps_list))
+    print("proj imgpts list is", len(proj_imgpts_list))
+    print("cam imgpts list is", len(cam_imgpts_list))
+
+    ret, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT, E, F = cv2.stereoCalibrate(
+        proj_objps_list, cam_imgpts_list, proj_imgpts_list, mtx, dist, proj_mtx, proj_dist, None)  
 
 
-    if ret == True:
-        print("STEREO CALIBRATED PARAMETERS!!!")
+    print("STEREO CALIBRATED PARAMETERS!!!, note that retval is", ret)
+    print("CAM INTRINSIC:")
+    print("camera matrix: \n")
+    print(cam_int)
+    print("Distortion: \n")
+    print(cam_dist)         
 
-        print("CAM INTRINSIC:")
-        print("camera matrix: \n")
-        print(cam_int)
-        print("Distortion: \n")
-        print(cam_dist)         
+    print("PROJ INTRINSIC:")
+    print("Projector matrix: \n")
+    print(proj_int)
+    print("Distortion: \n")
+    print(proj_dist)     
 
-        print("PROJ INTRINSIC:")
-        print("Projector matrix: \n")
-        print(proj_int)
-        print("Distortion: \n")
-        print(proj_dist)     
+    print("stereo R, T:")
+    print("R \n")
+    print(stereoR)
+    print("T \n")
+    print(stereoT)   
 
-        print("CAM R, T:")
-        print("R \n")
-        print(cam_proj_rmat)
-        print("T \n")
-        print(cam_proj_tvec)   
+    print("Essential matrix: \n")
+    print(E)
+    print("Fundamental matrix: \n")
+    print(F)      
 
-        print("Essential matrix: \n")
-        print(E)
-        print("Fundamental matrix: \n")
-        print(F)      
-    else:
-        print("stereo calibrate failed")
-
-
+    np.savez(os.path.join(baseDir, calName, "stereo.npz"), 
+             cam_int=proj_mtx, 
+             cam_dist=proj_dist,
+             proj_int=proj_int,
+             proj_dist=proj_dist,
+             stereoR=stereoR,
+             stereoT=stereoT,
+             E=E,
+             F=F)
 
      
