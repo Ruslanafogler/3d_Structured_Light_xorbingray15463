@@ -27,10 +27,6 @@ def get_chessboard_imgpts(img, checkerboard, dW1, show_img=False):
     cv2.destroyAllWindows()    
     return corners
 
-def get_proj_name(i, prefix, suffix):
-    num = i+1
-    return f'{prefix}_{num}'
-
 def get_slice(img, start_y, start_x, h=2048, w=2048):
     return img[start_y: start_y+h, start_x:start_x+w, :]
 
@@ -72,21 +68,30 @@ if __name__ == "__main__":
 
     #Input data locations
     #for CAMERA calibration:
-    baseDir = './data/calib/' #data directory
-    calName = '12_16_calib/cropped' #calibration sourse (also a dir in data)
-    projName = '12_15_projgray'
-    ambient = '12_16_normallighting_projgray'
-
+    baseDir = './data/new-calib/' #data directory
+    calName = '12_16_calib/cropped' #calibration source (cropped 2048x2048 images)
+    image_ext = 'JPG' #file extension for images
+    
+    
+    #for PROJECTOR calibration:
+    ambient = '12_16_normallighting_projgray' #checkerboards in NORMAL lighting for projector calib
     proj_prefix = '12_16_projgray'
     proj_suffix = ''
+    #get projector calib directories
+    def get_proj_name(i, prefix, suffix): 
+        num = i+1
+        return f'{prefix}_{num}'
     
 
+    normal_lighting_imgs = glob.glob(os.path.join(baseDir, ambient, "*"+image_ext))    
+    images = glob.glob(os.path.join(baseDir, calName, "*"+image_ext))
+
+    #WIDTH AND HEIGHT OF IMAGE
     w = 2048
     h = 2048
 
-    captures = 4 #number of directories for projector calibration
-    image_ext = 'JPG' #file extension for images
-    skip_cam_intrinsic = True
+    captures = len(normal_lighting_imgs) #number of directories for projector calibration
+    skip_cam_intrinsic = False
     load_proj_decoded = False
 
     get_offsets = False
@@ -96,9 +101,6 @@ if __name__ == "__main__":
     dW1 = (8, 8) #window size for finding checkerboard corners
     checkerboard = (6, 8) #number of internal corners on checkerboard
     size_of_square = 0.0235 #in cm
-
-    normal_lighting_imgs = glob.glob(os.path.join(baseDir, ambient, "*"+image_ext))    
-    images = glob.glob(os.path.join(baseDir, calName, "*"+image_ext))
 
     print("normal lighting paths:", normal_lighting_imgs)
     print("camera intrinsic calib paths:", images)
@@ -190,7 +192,7 @@ if __name__ == "__main__":
         
         cv2.destroyAllWindows()
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img_shape, None, None) 
-        np.savez(os.path.join(baseDir, calName, "cam_intrinsic_calib.npz"), mtx=mtx, dist=dist)
+        #np.savez(os.path.join(baseDir, calName, "cam_intrinsic_calib.npz"), mtx=mtx, dist=dist)
 
     else:
             print("SKIPPING intrinsc routine...")
@@ -397,7 +399,7 @@ if __name__ == "__main__":
     print(proj_dist) 
 
 
-    np.savez(os.path.join(baseDir, calName, "projector_intrinsic_calib.npz"), mtx=proj_mtx, dist=proj_dist)
+    #np.savez(os.path.join(baseDir, calName, "projector_intrinsic_calib.npz"), mtx=proj_mtx, dist=proj_dist)
 
     print("SKIPPING intrinsc routine...")
     intr_stuff = np.load(os.path.join(baseDir, calName, "cam_intrinsic_calib.npz"))
@@ -411,7 +413,7 @@ if __name__ == "__main__":
     print("cam imgpts list is", len(cam_imgpts_list))
 
     ret, cam_int, cam_dist, proj_int, proj_dist, stereoR, stereoT, E, F = cv2.stereoCalibrate(
-        proj_objps_list, cam_imgpts_list, proj_imgpts_list, mtx, dist, proj_mtx, proj_dist, None)  
+        proj_objps_list, cam_imgpts_list, proj_imgpts_list, mtx, dist, proj_mtx, proj_dist, None, )  
 
 
     print("STEREO CALIBRATED PARAMETERS!!!, note that retval is", ret)
@@ -438,14 +440,14 @@ if __name__ == "__main__":
     print("Fundamental matrix: \n")
     print(F)      
 
-    np.savez(os.path.join(baseDir, calName, "stereo.npz"), 
-             cam_int=cam_int, 
-             cam_dist=cam_dist,
-             proj_int=proj_int,
-             proj_dist=proj_dist,
-             stereoR=stereoR,
-             stereoT=stereoT,
-             E=E,
-             F=F)
+    # np.savez(os.path.join(baseDir, calName, "stereo.npz"), 
+    #          cam_int=cam_int, 
+    #          cam_dist=cam_dist,
+    #          proj_int=proj_int,
+    #          proj_dist=proj_dist,
+    #          stereoR=stereoR,
+    #          stereoT=stereoT,
+    #          E=E,
+    #          F=F)
 
      

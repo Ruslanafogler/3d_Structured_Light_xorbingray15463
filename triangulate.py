@@ -131,12 +131,12 @@ def select_points(img_path):
 if __name__ == "__main__":
     
     
-    baseDir = './data/calib' #data directory
+    baseDir = './data/new-calib' #data directory
     calName = '12_16_calib/cropped' #calibration sourse (also a dir in data)
 
-    dataDir = './data' #data directory
-    patternDir = 'gray' #calibration sourse (also a dir in data) 
-    subPatternDir = 'gray_12_16'  
+    dataDir = './new_data' #data directory
+    pattern = 'xor' #calibration sourse (also a dir in data) 
+    patternDir = 'xor_wad' 
     image_ext="JPG" 
     load_proj_decoded = False
 
@@ -144,12 +144,8 @@ if __name__ == "__main__":
     w = 2048
 
 
-    #form a 2048x2048 bounding box around bird following this offset 
-
-    #bird offset 1075, 2297]
-
-
-    IMG_PATHS = glob.glob(os.path.join(dataDir, patternDir,subPatternDir, "*"+image_ext))
+    IMG_PATHS = glob.glob(os.path.join(dataDir, patternDir, "*"+image_ext))
+    
     ###############################################################
     ###############################################################
     ###############################################################
@@ -193,18 +189,27 @@ if __name__ == "__main__":
     print(F)   
 
 
+
+
+
     print("\n\n")
+    print("reading from...",os.path.join(dataDir, patternDir, "*"+image_ext) )
+    print("IMG PATHS ARE", IMG_PATHS)
     print("Select a point to form top left corner of 2048x2048 bounding box")
-    points = select_points(IMG_PATHS[-1])
-    print("point is", points)
-    offsety, offsetx = points[0]
+    # points = select_points(IMG_PATHS[-1])
+    # print("point is", points)
+    # offsety, offsetx = points[0]
 
 
-    offsety = 918
-    offsetx = 2297
-
-    # offsety = 1075
+    ##FOR BIRD
+    # offsety = 918
     # offsetx = 2297
+
+    ##FOR AMONG US
+    offsety = 869
+    offsetx = 2394
+ 
+
 
 
 
@@ -224,10 +229,10 @@ if __name__ == "__main__":
             proj_gray_patterns[:,:,:,idx] = get_slice(proj_gray_patterns_before[:,:,:,idx], offsety, offsetx)
 
         proj_codes = classify_imgstack_codes(proj_gray_patterns, threshold=get_per_pixel_threshold(proj_gray_patterns))
-        decoded = decode(patternDir, proj_codes)
-        np.save(f"{patternDir}_decoded.npy", decoded)
+        decoded = decode(pattern, proj_codes)
+        np.save(f"{pattern}_decoded.npy", decoded)
     else:
-        decoded = np.load(f"{patternDir}_decoded.npy")
+        decoded = np.load(f"{pattern}_decoded.npy")
 
 
 
@@ -246,7 +251,7 @@ if __name__ == "__main__":
 
 
 
-    n = 10 #downsample by
+    n = 5 #downsample by
     i = 0
     
     show_correspondence = True
@@ -370,9 +375,9 @@ if __name__ == "__main__":
                pointCloud[:,1],
                pointCloud[:,2],
                c=color_pts/255.0)
-    ax.set_xlim(-0.5, 0.5)
-    ax.set_ylim(-0.5, 0.5)
-    ax.set_zlim(-0.5, 0.5)
+    ax.view_init(elev=-79, azim=-90, roll=0)
+    ax.set_zlim(0.4, 1.4)
+    set_axes_equal(ax) 
 
     # ax1 = fig2.add_subplot(122, projection='3d')
     # ax1.set_xlabel('X')
