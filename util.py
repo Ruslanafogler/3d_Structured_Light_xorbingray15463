@@ -69,15 +69,8 @@ def decode_gray(img_codes):
     pows_of_two = pows_of_two[::-1]
     #recusive conversion for gray2bin
     print("type of img_codes is", img_codes.dtype)
-    
     img_codes = img_codes.astype(int)
-
     bin_codes = gray2bin(img_codes, num_codes)
-    
-    
-    # for i in range(1, num_codes):
-    #     img_codes[:,:,i] = np.bitwise_xor(img_codes[:,:,i], img_codes[:,:,i-1])
-
     decoded = np.sum(bin_codes * pows_of_two, axis=2)
     return decoded
 
@@ -128,81 +121,12 @@ def pixel2ray(points, intr_mxtx, dist):
 
 
 
-
-def get_plane_intersection(camera_3dpt, rays):
-    #camera and rays are in respect to PLANE coords!!!
-    #rays are 3x2
-    intersections = np.zeros_like(rays)
-    camera_z_coord = camera_3dpt[2,:]
-    rays_z_scalar = rays[2,:]
-    t = -camera_z_coord/rays_z_scalar
-    intersections = camera_3dpt + rays*t
-    return intersections
-
-
-def get_camera_center(intr_mxtx, dist):
-    origin = np.zeros((2,1)) #origin, but homo
-    ray = pixel2ray(origin, intr_mxtx, dist)
-    return ray
-
-
-def camera_to_plane(camera_3dpt, R, T):
-    shape_of_input = camera_3dpt.shape
-    assert shape_of_input[0] == 3, f"rows should be 3 long, instead shape was {shape_of_input}"
-    transformed = np.dot(R.T,(camera_3dpt - T)) 
-    return transformed
-
-
-def plane_to_camera(plane_3dpt, R, T):
-    shape_of_input = plane_3dpt.shape
-    assert shape_of_input[0] == 3, f"rows should be 3 long, instead shape was {shape_of_input}"
-    transformed = np.dot(R, plane_3dpt) + T
-    return transformed
-
-
-
-def get_ray_plane_intersection(ray, ray_pt, plane_pt, normal):
-    #Ax + By + Cz = 0
-    #[x,y,z] = rt + [x0, y0, z0]
-    A = normal[0]
-    B = normal[1]
-    C = normal[2]
-    D = -np.dot(plane_pt, normal)
-
-
-    #t = (D-np.dot(normal, ray))/(D-np.dot(normal,ray_pt))
-    t= np.dot(normal, plane_pt-ray_pt)/np.dot(normal, ray)
-    
-    return ray*t
-
-
-
-def get_cam_proj_corresponence(ray_world, proj_plane_pt, proj_normal):
-    intersection = get_ray_plane_intersection(ray_world, proj_plane_pt, proj_normal)
-    return intersection[:,2]
-
-
 def write_image(path, data, is_float=True):
     if(is_float):
         data = np.clip(data, 0.0, 1.0)
         data = data*255
     saved = data.astype(np.uint8)
     ski_io.imsave(path, saved)
-
-def get_ray_intersection(points, R, T, intr_mxtx, dist):    
-    rays_plane_coords = np.matmul(R.T, np.squeeze(pixel2ray(points, intr_mxtx, dist)).T)
-    camera_center_plane = camera_to_plane(np.zeros((3,1)), R, T) #get camera center in plane coords
-    #intersections = get_plane_intersection(camera_center_plane, rays_plane_coords)  
-    camera_z_coord = camera_center_plane[2,:]
-    rays_z_scalar = rays_plane_coords[2,:]
-    t = -camera_z_coord/rays_z_scalar
-    intersections = camera_center_plane + rays_plane_coords*t    
-    return intersections, rays_plane_coords
-
-
-
-def intersect_proj_plane_camera_ray():
-    pass
 
 #code inspired from https://stackoverflow.com/questions/5967500/how-to-correctly-sort-a-string-with-a-number-inside
 def atoi(text):
