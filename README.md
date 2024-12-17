@@ -1,4 +1,5 @@
 ## IMPORTANT FILES:
+# video : https://youtu.be/HCgNJcoP4r8
 # myCamProjCalibration
 contains code for calibrating intrinsic parameters of camera, then of the projector (relies on multiple directory paths to camera calibration, ambient lighting of chessboard poses, gray-code projected stacks of chessboard poses)
 First it does Zhang's method of calibration, then it uses projector calibration algorithm described in D. Moreno and G. Taubin, "Simple, Accurate, and Robust Projector-Camera Calibration," 2012 Second International Conference on 3D Imaging, Modeling, Processing, Visualization & Transmission, Zurich, Switzerland, 2012, pp. 464-471, doi: 10.1109/3DIMPVT.2012.77.
