@@ -20,8 +20,7 @@ def get_chessboard_imgpts(img, checkerboard, dW1, show_img=False):
         print("error: checkerboard not found")
 
     if(show_img):
-        resized_image = cv2.resize(img, (800, 600))
-        cv2.imshow('img',resized_image)
+        cv2.imshow('img',img)
         cv2.setWindowTitle('img', "chessboard") 
         cv2.waitKey(0)
     cv2.destroyAllWindows()    
